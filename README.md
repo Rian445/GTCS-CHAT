@@ -17,5 +17,5 @@ samples, guidance on mobile development, and a full API reference.
 
 ## Screenshots
 
-![Screenshot 1](assets/1741474618919.jpg)
-![Screenshot 2](assets/1741474618935.jpg)
+<img src="assets/1741474618919.jpg" width="300" />
+<img src="assets/1741474618935.jpg" width="300" />
