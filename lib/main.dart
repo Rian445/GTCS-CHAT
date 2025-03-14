@@ -11,6 +11,8 @@ void main() async {
 }
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
   _MyAppState createState() => _MyAppState();
 }
@@ -67,7 +69,7 @@ class _MyAppState extends State<MyApp> {
 
 class AuthWrapper extends StatelessWidget {
   final VoidCallback toggleTheme;
-  AuthWrapper({required this.toggleTheme});
+  const AuthWrapper({super.key, required this.toggleTheme});
 
   @override
   Widget build(BuildContext context) {

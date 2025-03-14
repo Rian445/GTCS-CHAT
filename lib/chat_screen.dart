@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
-  ChatScreen({required this.toggleTheme});
+  const ChatScreen({super.key, required this.toggleTheme});
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
