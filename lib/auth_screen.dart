@@ -4,9 +4,9 @@ import 'package:lottie/lottie.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback? toggleTheme; // Add toggle theme callback
-  
+
   AuthScreen({this.toggleTheme});
-  
+
   @override
   _AuthScreenState createState() => _AuthScreenState();
 }
@@ -18,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   bool isLogin = true;
   String? errorMessage;
   bool isLoading = false;
-  
+
   // Animation controller
   late AnimationController _animationController;
 
@@ -30,10 +30,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(seconds: 3), // Animation duration
     );
-    
+
     // Auto-play the animation
     _animationController.forward();
-    
+
     // Make animation loop
     _animationController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -92,23 +92,31 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     // Get current theme to check if dark mode is enabled
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+    final gradientColors = isDarkMode
+        ? [Colors.deepPurple, Colors.indigo]
+        : [Colors.blue, Colors.purple];
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(isLogin ? "Login" : "Register"),
+        title: Text(
+          isLogin ? "Login" : "Register",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
-        flexibleSpace: isDarkMode 
-          ? null  // No gradient in dark mode
-          : Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.purple],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-        // Add dark mode toggle button
+          ),
+        ),
+        elevation: 0,
         actions: [
           IconButton(
             icon: Icon(
@@ -135,9 +143,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   fit: BoxFit.contain,
                 ),
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Name Field (only shown during registration)
               if (!isLogin)
                 Column(
@@ -146,56 +154,98 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       controller: _nameController,
                       decoration: InputDecoration(
                         labelText: 'Full Name',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        labelStyle: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.black54,
                         ),
-                        prefixIcon: Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        prefixIcon: Icon(
+                          Icons.person,
+                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                        ),
+                        floatingLabelBehavior: FloatingLabelBehavior.never, // Keep label inside
+                      ),
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
                     SizedBox(height: 15),
                   ],
                 ),
-              
+
               // Email Field
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  labelStyle: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
                   ),
-                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                  prefixIcon: Icon(
+                    Icons.email,
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                  ),
+                  floatingLabelBehavior: FloatingLabelBehavior.never, // Keep label inside
+                ),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Password Field
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  labelStyle: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
                   ),
-                  prefixIcon: Icon(Icons.lock),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                  ),
+                  floatingLabelBehavior: FloatingLabelBehavior.never, // Keep label inside
+                ),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 obscureText: true,
               ),
-              
+
               // Error Message
               if (errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
                     errorMessage!,
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-                
+
               SizedBox(height: 20),
-              
+
               // Login/Register Button
               isLoading
                   ? CircularProgressIndicator()
@@ -203,18 +253,24 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       onPressed: _authenticate,
                       style: ElevatedButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         minimumSize: Size(double.infinity, 50),
+                        backgroundColor: isDarkMode ? Colors.deepPurple : Colors.blue,
+                        padding: EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: Text(
                         isLogin ? 'Login' : 'Register',
-                        style: TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    
+
               SizedBox(height: 10),
-              
+
               // Toggle between Login and Register
               TextButton(
                 onPressed: () {
@@ -227,6 +283,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   isLogin
                       ? "Don't have an account? Register"
                       : "Already have an account? Login",
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],

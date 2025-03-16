@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_screen.dart';
 import 'chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,10 +19,35 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light; // Default to light mode
 
-  void _toggleTheme() {
+  // Load theme preference from SharedPreferences
+  Future<void> _loadThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isDarkMode = prefs.getBool('isDarkMode') ?? false; // Default to light mode
     setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
     });
+  }
+
+  // Save theme preference to SharedPreferences
+  Future<void> _saveThemePreference(bool isDarkMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', isDarkMode);
+  }
+
+  void _toggleTheme() async {
+    final isDarkMode = _themeMode == ThemeMode.light;
+    setState(() {
+      _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
+    });
+    // Save the new theme preference
+    await _saveThemePreference(isDarkMode);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Load theme preference when the app starts
+    _loadThemePreference();
   }
 
   @override
