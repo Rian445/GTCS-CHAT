@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
-  const ChatScreen({super.key, required this.toggleTheme});
+  ChatScreen({required this.toggleTheme});
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -15,6 +15,35 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Map<String, String> _userNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserNames();
+  }
+
+  // Load user names from Firestore
+  void _loadUserNames() async {
+    QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
+    
+    Map<String, String> userNames = {};
+    for (var doc in usersSnapshot.docs) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      if (data.containsKey('email') && data.containsKey('name')) {
+        userNames[data['email']] = data['name'];
+      }
+    }
+    
+    setState(() {
+      _userNames = userNames;
+    });
+  }
+
+  // Get display name for a user
+  String _getDisplayName(String email) {
+    return _userNames[email] ?? email.split('@')[0]; // Fallback to email if name not found
+  }
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
@@ -35,8 +64,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true, // Ensures title is in the center
-        backgroundColor: isDarkMode ? Colors.grey[900] : null, // Dark grey in dark mode
+        centerTitle: true,
+        backgroundColor: isDarkMode ? Colors.grey[900] : null,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -87,6 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     var message = messages[index];
                     String messageText = message['text'];
                     String messageSender = message['sender'] ?? "Unknown";
+                    String displayName = _getDisplayName(messageSender);
 
                     bool isMe = messageSender == currentUser;
 
@@ -113,10 +143,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              messageSender,
+                              displayName,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white70,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                             SizedBox(height: 5),

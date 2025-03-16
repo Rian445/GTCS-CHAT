@@ -11,8 +11,6 @@ void main() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
   @override
   _MyAppState createState() => _MyAppState();
 }
@@ -69,18 +67,28 @@ class _MyAppState extends State<MyApp> {
 
 class AuthWrapper extends StatelessWidget {
   final VoidCallback toggleTheme;
-  const AuthWrapper({super.key, required this.toggleTheme});
+  AuthWrapper({required this.toggleTheme});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.active) {
+          User? user = snapshot.data;
+          if (user == null) {
+            // Pass toggleTheme to AuthScreen
+            return AuthScreen(toggleTheme: toggleTheme);
+          }
           return ChatScreen(toggleTheme: toggleTheme);
-        } else {
-          return AuthScreen();
         }
+        
+        // Show loading indicator while checking auth state
+        return Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
       },
     );
   }

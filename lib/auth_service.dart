@@ -1,15 +1,31 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Register User
-  Future<String?> registerUser(String email, String password) async {
+  Future<String?> registerUser(String email, String password, String name) async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      // Create user with email and password
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email, 
+        password: password
+      );
+      
+      // Save user name to Firestore
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'name': name,
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
       return null; // Success
     } on FirebaseAuthException catch (e) {
       return _getErrorMessage(e);
+    } catch (e) {
+      return "An unexpected error occurred. Please try again later.";
     }
   }
 
@@ -21,6 +37,19 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return _getErrorMessage(e);
     }
+  }
+
+  // Get current user name
+  Future<String?> getCurrentUserName() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        return userData['name'];
+      }
+    }
+    return null;
   }
 
   // Logout
