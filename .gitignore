@@ -47,4 +47,4 @@ app.*.map.json
 
 
 /google-services.jason
-/firebase.json
+firebase.json
