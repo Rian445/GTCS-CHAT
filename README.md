@@ -10,4 +10,7 @@ Built a real-time chat application using Flutter, with Firebase for user authent
 <div style="display: flex; justify-content: space-around;">
   <img src="assets/1741474618919.jpg" width="300" />
   <img src="assets/1741474618935.jpg" width="300" />
+  <img src="assets/white.jpg" width="300" />
+  <img src="assets/chat.jpg" width="300" />
+
 </div>
