@@ -4,10 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_screen.dart';
 import 'chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Initialize the notification service
+  await NotificationService().init();
+  
   runApp(MyApp());
 }
 

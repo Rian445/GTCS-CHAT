@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'notification_service.dart'; // Import the notification service
 
 class ChatScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -15,17 +16,32 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService(); // Initialize notification service
   Map<String, String> _userNames = {};
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToBottomButton = false;
   bool _isNearBottom = true;
   final PageStorageKey _listViewKey = PageStorageKey('chatListView');
+  Stream<QuerySnapshot>? _messagesStream;
+  String? _lastMessageId;
 
   @override
   void initState() {
     super.initState();
     _loadUserNames();
     _scrollController.addListener(_onScroll);
+    
+    // Subscribe to chat room topic
+    _notificationService.subscribeToTopic('chatroom');
+    
+    // Initialize messages stream
+    _messagesStream = _firestore
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots();
+        
+    // Listen for new messages to show notifications when app is in foreground but user is not looking at chat
+    _listenForNewMessages();
   }
 
   @override
@@ -33,6 +49,39 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Listen for new messages to show notifications
+  void _listenForNewMessages() {
+    _messagesStream?.listen((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        final lastDoc = snapshot.docs.last;
+        final lastMessageId = lastDoc.id;
+        
+        // If this is not the first load and we have a new message
+        if (_lastMessageId != null && _lastMessageId != lastMessageId) {
+          final data = lastDoc.data() as Map<String, dynamic>;
+          final sender = data['sender'] ?? 'Unknown';
+          final text = data['text'] ?? '';
+          
+          // Only show notification if the message is not from the current user
+          if (sender != _auth.currentUser?.email) {
+            String senderName = _getDisplayName(sender);
+            
+            // Show local notification
+            _notificationService.showLocalNotification(
+              id: lastMessageId.hashCode,
+              title: senderName,
+              body: text,
+              payload: 'chat',
+            );
+          }
+        }
+        
+        // Update the last message ID
+        _lastMessageId = lastMessageId;
+      }
+    });
   }
 
   // Load user names from Firestore
@@ -103,6 +152,17 @@ class _ChatScreenState extends State<ChatScreen> {
       _showScrollToBottomButton = !_isNearBottom;
     });
   }
+  
+  // Method to send a test notification
+  void _sendTestNotification() {
+    // Show a local notification for testing
+    _notificationService.showLocalNotification(
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: 'Test Notification',
+      body: 'This is a test notification from GTCS Chat!',
+      payload: 'test',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +194,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(Icons.notifications, color: Colors.white),
+            onPressed: _sendTestNotification,
+            tooltip: 'Test Notification',
+          ),
+          IconButton(
             icon: Icon(Icons.brightness_6, color: Colors.white),
             onPressed: widget.toggleTheme,
           ),
@@ -152,10 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('messages')
-                      .orderBy('timestamp', descending: false)
-                      .snapshots(),
+                  stream: _messagesStream,
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return Center(child: CircularProgressIndicator());
