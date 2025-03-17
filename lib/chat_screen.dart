@@ -3,6 +3,8 @@ import 'auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'notification_service.dart';
+import 'loading_overlay.dart';
+import 'package:lottie/lottie.dart';
 
 class ChatScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -23,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isNearBottom = true;
   String? _lastMessageId;
   Stream<QuerySnapshot>? _messagesStream;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -137,7 +140,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 300),
+        duration: Duration(milliseconds: 150),
         curve: Curves.easeOut,
       );
     }
@@ -172,246 +175,283 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // Method to handle logout with loading overlay
+  Future<void> _handleLogout() async {
+    setState(() {
+      _isLoggingOut = true;
+    });
+
+    // Ensure the loading animation shows for at least 3 seconds
+    await Future.delayed(Duration(seconds: 2));
+    await AuthService().logout();
+    
+    // No need to set _isLoggingOut to false since this widget will be disposed
+  }
+
   @override
   Widget build(BuildContext context) {
     final String currentUser = _auth.currentUser?.email ?? "";
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: isDarkMode ? Colors.grey[900] : null,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode
-                ? null
-                : LinearGradient(
-                    colors: [Colors.purple, Colors.blue],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+    return LoadingOverlay(
+      isLoading: _isLoggingOut,
+      child: Scaffold(
+        appBar: AppBar(
+          centerTitle: true,
+          backgroundColor: isDarkMode ? Colors.grey[900] : null,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: isDarkMode
+                  ? null
+                  : LinearGradient(
+                      colors: [Colors.purple, Colors.blue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+            ),
           ),
+          title: Text(
+            'GTCS Chat',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.notifications, color: Colors.white),
+              onPressed: _sendTestNotification,
+              tooltip: 'Test Notification',
+            ),
+            IconButton(
+              icon: Icon(Icons.brightness_6, color: Colors.white),
+              onPressed: widget.toggleTheme,
+            ),
+            IconButton(
+              icon: Icon(Icons.logout, color: Colors.white),
+              onPressed: _handleLogout,
+            ),
+          ],
+          elevation: 5,
         ),
-        title: Text(
-          'GTCS Chat',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications, color: Colors.white),
-            onPressed: _sendTestNotification,
-            tooltip: 'Test Notification',
-          ),
-          IconButton(
-            icon: Icon(Icons.brightness_6, color: Colors.white),
-            onPressed: widget.toggleTheme,
-          ),
-          IconButton(
-            icon: Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await AuthService().logout();
-            },
-          ),
-        ],
-        elevation: 5,
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _messagesStream,
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return Center(child: CircularProgressIndicator());
-                      }
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: _messagesStream,
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return Center(child: CircularProgressIndicator());
+                        }
 
-                      var messages = snapshot.data!.docs;
-                      String? previousSender;
-                      
-                      // Only auto-scroll for new messages if user is already near bottom
-                      if (snapshot.connectionState == ConnectionState.active && 
-                          snapshot.hasData && 
-                          _isNearBottom) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_scrollController.hasClients) {
-                            _scrollToBottom();
-                          }
-                        });
-                      }
+                        var messages = snapshot.data!.docs;
+                        String? previousSender;
+                        
+                        // Only auto-scroll for new messages if user is already near bottom
+                        if (snapshot.connectionState == ConnectionState.active && 
+                            snapshot.hasData && 
+                            _isNearBottom) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (_scrollController.hasClients) {
+                              _scrollToBottom();
+                            }
+                          });
+                        }
 
-                      return NotificationListener<ScrollNotification>(
-                        // This additional notification listener ensures we catch all scroll events
-                        onNotification: (notification) {
-                          if (notification is ScrollEndNotification) {
-                            _onScroll();
-                          }
-                          return false; // Return false to allow the notification to continue propagating
-                        },
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(), // Ensure scrolling works even with few items
-                          controller: _scrollController,
-                          itemCount: messages.length,
-                          itemBuilder: (context, index) {
-                            var message = messages[index];
-                            String messageText = message['text'];
-                            String messageSender = message['sender'] ?? "Unknown";
-                            String displayName = _getDisplayName(messageSender);
-                            String initials = _getInitials(displayName);
-
-                            bool isMe = messageSender == currentUser;
-                            bool showProfilePicture = previousSender != messageSender;
-                            previousSender = messageSender;
-                            
-                            return Container(
-                              margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                children: [
-                                  if (!isMe && showProfilePicture)
-                                    Container(
-                                      margin: EdgeInsets.only(right: 8),
-                                      child: CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: isDarkMode ? Colors.blue[800] : Colors.blue,
-                                        child: Text(
-                                          initials,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
+                        return NotificationListener<ScrollNotification>(
+                          // This additional notification listener ensures we catch all scroll events
+                          onNotification: (notification) {
+                            if (notification is ScrollEndNotification) {
+                              _onScroll();
+                            }
+                            return false; // Return false to allow the notification to continue propagating
+                          },
+                          child: messages.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Lottie.asset(
+                                      'assets/animation.json',
+                                      width: 150,
+                                      height: 150,
+                                    ),
+                                    SizedBox(height: 20),
+                                    Text(
+                                      'No messages yet.\nBe the first to say hello!',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                  Column(
-                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      if (!isMe && showProfilePicture)
-                                        Text(
-                                          displayName,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDarkMode ? Colors.white70 : Colors.black54,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                        ),
-                                        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                                        decoration: BoxDecoration(
-                                          gradient: isMe
-                                              ? (isDarkMode
-                                                  ? LinearGradient(
-                                                      colors: [Color(0xFFFF5ACD), Color(0xFFB429FF)],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
-                                                    )
-                                                  : LinearGradient(
-                                                      colors: [Colors.blue, Colors.green],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
-                                                    ))
-                                              : (isDarkMode
-                                                  ? LinearGradient(
-                                                      colors: [Color(0xFF2B5EE0), Color(0xFF45C7FF)],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
-                                                    )
-                                                  : LinearGradient(
-                                                      colors: [Colors.grey[300]!, Colors.grey[400]!],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
-                                                    )),
-                                          borderRadius: BorderRadius.only(
-                                            topLeft: Radius.circular(20),
-                                            topRight: Radius.circular(20),
-                                            bottomLeft: isMe ? Radius.circular(20) : Radius.circular(5),
-                                            bottomRight: isMe ? Radius.circular(5) : Radius.circular(20),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          messageText,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: isMe ? Colors.white : (isDarkMode ? Colors.white : Colors.black),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                            child: TextField(
-                              controller: _messageController,
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: "Enter message",
-                                hintStyle: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                                  ],
                                 ),
-                                border: InputBorder.none,
+                              )
+                            : ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(), // Ensure scrolling works even with few items
+                                controller: _scrollController,
+                                itemCount: messages.length,
+                                itemBuilder: (context, index) {
+                                  var message = messages[index];
+                                  String messageText = message['text'];
+                                  String messageSender = message['sender'] ?? "Unknown";
+                                  String displayName = _getDisplayName(messageSender);
+                                  String initials = _getInitials(displayName);
+
+                                  bool isMe = messageSender == currentUser;
+                                  bool showProfilePicture = previousSender != messageSender;
+                                  previousSender = messageSender;
+                                  
+                                  return Container(
+                                    margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                      children: [
+                                        if (!isMe && showProfilePicture)
+                                          Container(
+                                            margin: EdgeInsets.only(right: 8),
+                                            child: CircleAvatar(
+                                              radius: 12,
+                                              backgroundColor: isDarkMode ? Colors.blue[800] : Colors.blue,
+                                              child: Text(
+                                                initials,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        Column(
+                                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                          children: [
+                                            if (!isMe && showProfilePicture)
+                                              Text(
+                                                displayName,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            Container(
+                                              constraints: BoxConstraints(
+                                                maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                              ),
+                                              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                                              decoration: BoxDecoration(
+                                                gradient: isMe
+                                                    ? (isDarkMode
+                                                        ? LinearGradient(
+                                                            colors: [Color(0xFFFF5ACD), Color(0xFFB429FF)],
+                                                            begin: Alignment.topLeft,
+                                                            end: Alignment.bottomRight,
+                                                          )
+                                                        : LinearGradient(
+                                                            colors: [Colors.blue, Colors.green],
+                                                            begin: Alignment.topLeft,
+                                                            end: Alignment.bottomRight,
+                                                          ))
+                                                    : (isDarkMode
+                                                        ? LinearGradient(
+                                                            colors: [Color(0xFF2B5EE0), Color(0xFF45C7FF)],
+                                                            begin: Alignment.topLeft,
+                                                            end: Alignment.bottomRight,
+                                                          )
+                                                        : LinearGradient(
+                                                            colors: [Colors.grey[300]!, Colors.grey[400]!],
+                                                            begin: Alignment.topLeft,
+                                                            end: Alignment.bottomRight,
+                                                          )),
+                                                borderRadius: BorderRadius.only(
+                                                  topLeft: Radius.circular(20),
+                                                  topRight: Radius.circular(20),
+                                                  bottomLeft: isMe ? Radius.circular(20) : Radius.circular(5),
+                                                  bottomRight: isMe ? Radius.circular(5) : Radius.circular(20),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                messageText,
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: isMe ? Colors.white : (isDarkMode ? Colors.white : Colors.black),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                              child: TextField(
+                                controller: _messageController,
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "Enter message",
+                                  hintStyle: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                                  ),
+                                  border: InputBorder.none,
+                                ),
+                                onSubmitted: (_) => _sendMessage(),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: 8),
-                      CircleAvatar(
-                        backgroundColor: Colors.blue,
-                        radius: 25,
-                        child: IconButton(
-                          icon: Icon(Icons.send, color: Colors.white),
-                          onPressed: _sendMessage,
+                        SizedBox(width: 8),
+                        CircleAvatar(
+                          backgroundColor: isDarkMode ? Colors.deepPurple : Colors.blue,
+                          radius: 25,
+                          child: IconButton(
+                            icon: Icon(Icons.send, color: Colors.white),
+                            onPressed: _sendMessage,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_showScrollToBottomButton)
+                Positioned(
+                  bottom: 80,
+                  right: 20,
+                  child: FloatingActionButton(
+                    mini: true,
+                    backgroundColor: isDarkMode ? Colors.deepPurple : Colors.blue,
+                    onPressed: _scrollToBottom,
+                    child: Icon(Icons.arrow_downward, color: Colors.white),
                   ),
                 ),
-              ],
-            ),
-            if (_showScrollToBottomButton)
-              Positioned(
-                bottom: 80,
-                right: 20,
-                child: FloatingActionButton(
-                  mini: true,
-                  backgroundColor: Colors.blue,
-                  onPressed: _scrollToBottom,
-                  child: Icon(Icons.arrow_downward, color: Colors.white),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

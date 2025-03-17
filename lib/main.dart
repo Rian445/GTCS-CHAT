@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart';
 import 'auth_screen.dart';
 import 'chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_service.dart';
+import 'loading_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +27,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light; // Default to light mode
+  bool _initializing = true;
 
   // Load theme preference from SharedPreferences
   Future<void> _loadThemePreference() async {
@@ -32,6 +35,7 @@ class _MyAppState extends State<MyApp> {
     final isDarkMode = prefs.getBool('isDarkMode') ?? false; // Default to light mode
     setState(() {
       _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
+      _initializing = false;
     });
   }
 
@@ -93,7 +97,21 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
       ),
-      home: AuthWrapper(toggleTheme: _toggleTheme), // Pass toggleTheme function
+      home: FutureLoadingBuilder(
+        future: () async {
+          // We're using the state loaded in initState, but adding a small delay
+          // to ensure the loading animation shows properly
+          if (!_initializing) {
+            await Future.delayed(Duration(milliseconds: 500));
+          } else {
+            // Wait for initialization if it's still in progress
+            while (_initializing) {
+              await Future.delayed(Duration(milliseconds: 100));
+            }
+          }
+        },
+        child: AuthWrapper(toggleTheme: _toggleTheme), // Pass toggleTheme function
+      ),
     );
   }
 }
@@ -119,7 +137,12 @@ class AuthWrapper extends StatelessWidget {
         // Show loading indicator while checking auth state
         return Scaffold(
           body: Center(
-            child: CircularProgressIndicator(),
+            child: Lottie.asset(
+              'assets/load.json',
+              width: 200,
+              height: 200,
+              fit: BoxFit.contain,
+            ),
           ),
         );
       },
