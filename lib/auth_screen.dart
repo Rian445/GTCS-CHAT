@@ -5,7 +5,7 @@ import 'package:lottie/lottie.dart';
 class AuthScreen extends StatefulWidget {
   final VoidCallback? toggleTheme; // Add toggle theme callback
 
-  AuthScreen({this.toggleTheme});
+  const AuthScreen({super.key, this.toggleTheme});
 
   @override
   _AuthScreenState createState() => _AuthScreenState();
@@ -135,7 +135,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Lottie Animation
-              Container(
+              SizedBox(
                 height: 200,
                 child: Lottie.asset(
                   'assets/animation.json', // Path to your animation file
